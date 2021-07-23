@@ -1629,6 +1629,33 @@ func TestServiceOwnsFrontendIP(t *testing.T) {
 			},
 		},
 		{
+			desc: "serviceOwnsFrontendIP should return false if there is no public IP address in the frontend IP config",
+			existingPIPs: []network.PublicIPAddress{
+				{
+					ID: to.StringPtr("pip"),
+					PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
+						IPAddress: to.StringPtr("4.3.2.1"),
+					},
+				},
+			},
+			fip: network.FrontendIPConfiguration{
+				Name: to.StringPtr("auid"),
+				FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
+					PublicIPPrefix: &network.SubResource{
+						ID: to.StringPtr("pip1"),
+					},
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: meta.ObjectMeta{
+					UID: types.UID("secondary"),
+				},
+				Spec: v1.ServiceSpec{
+					LoadBalancerIP: "4.3.2.1",
+				},
+			},
+		},
+		{
 			desc: "serviceOwnsFrontendIP should detect the secondary external service",
 			existingPIPs: []network.PublicIPAddress{
 				{
@@ -1951,4 +1978,26 @@ func TestGetNodeCIDRMasksByProviderIDAvailabilitySet(t *testing.T) {
 			assert.Equal(t, tc.expectedIPV6MaskSize, ipv6MaskSize)
 		})
 	}
+}
+
+func TestGetAvailabilitySetNameByID(t *testing.T) {
+	t.Run("getAvailabilitySetNameByID should return empty string if the given ID is empty", func(t *testing.T) {
+		vmasName, err := getAvailabilitySetNameByID("")
+		assert.Nil(t, err)
+		assert.Empty(t, vmasName)
+	})
+
+	t.Run("getAvailabilitySetNameByID should report an error if the format of the given ID is wrong", func(t *testing.T) {
+		asID := "illegal-id"
+		vmasName, err := getAvailabilitySetNameByID(asID)
+		assert.Equal(t, fmt.Errorf("getAvailabilitySetNameByID: failed to parse the VMAS ID illegal-id"), err)
+		assert.Empty(t, vmasName)
+	})
+
+	t.Run("getAvailabilitySetNameByID should extract the VMAS name from the given ID", func(t *testing.T) {
+		asID := "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/availabilitySets/as"
+		vmasName, err := getAvailabilitySetNameByID(asID)
+		assert.Nil(t, err)
+		assert.Equal(t, "as", vmasName)
+	})
 }
